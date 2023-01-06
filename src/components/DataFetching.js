@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import "./custom.css"
 import _ from "lodash"
+import PropTypes from 'prop-types'
 
 
-let api1 = `https://jsonplaceholder.typicode.com/posts`;
-let api2 = "https://jsonplaceholder.typicode.com/users";
-
-function DataFetching() {
+function DataFetching(props) {
+    const { onSubmit } = props;
     const [post, setPost] = useState([])
     const [listData, setListData] = useState([])
     const [nameApi, setNameApi] = useState('')
@@ -16,13 +15,29 @@ function DataFetching() {
     const [limit, setLimit] = useState(0);
     const [Offset, setOffset] = useState(10);
     const [text, setText] = useState('')
-    const [nameOrder, setNameOrder] = useState("ASC");
     const [nameapiOld, setNameapiOld] = useState('');
     const [order, setOrder] = useState('asc');
     const [paginatePost, setPaginatePost] = useState()
-    const [currentPage, setCurrentPage] = useState(1)
+    const [pageIndex, setPageIndex] = useState(1)
+    const [newDataApi2, setNewDataApi2] = useState('');
+    const AppContext = createContext(undefined);
+    const [dataLimit, setDataLimit] = useState("ASC");
 
-    // let pages = '';
+    // export const UseAppContext = () => {
+    //     return useContext(AppContext);
+    // };
+
+    // export const AppContextProvider = (props) => {
+    //     const [apiData, setApiData] = useState([]);
+    //     const globalValue = "Global Value"
+
+    DataFetching.propTypes = {
+        onSubmit: PropTypes.func,
+    };
+    DataFetching.defaultProps = {
+        onSubmit: null,
+    };
+
     const getDataApi1 = async (api) => {
         return axios.get(api);
     };
@@ -40,57 +55,76 @@ function DataFetching() {
         return newData;
     };
 
-    const pageSize = 10;
+
+    let api2 = `https://jsonplaceholder.typicode.com/users`;
+    let api1 = `https://jsonplaceholder.typicode.com/posts`;
     useEffect(() => {
         let data1 = [];
         let data2 = [];
         let dataApi1 = [];
-        const getcountry = async () => {
-            const response = await fetch(`https://jsonplaceholder.typicode.com/users/${nameApi}`)
-            let getcon = await response.json();
-            if (nameApi && (nameApi != '')) {
-                getcon = [getcon]
-            }
-            // // console.log(getcon)
-            setCountry(await getcon)
-        }
-        getcountry();
 
-        const getData = async () => {
+        const getcountry = async () => {
+            // const response = await fetch(api2 + `${nameApi}`);
+            const response = await fetch(`https://jsonplaceholder.typicode.com/users/${nameApi}`)
+            let dataApi2 = await response.json();
+            if (nameApi && (nameApi != '')) {
+                dataApi2 = [dataApi2]
+            }
+
+            setCountry(await dataApi2);
+            // setNewDataApi2(await dataApi2)
+            setNewDataApi2(await dataApi2);
+            console.log('newDataApi2', dataApi2);
+            return dataApi2;
+        }
+
+        // getcountry();
+
+        let getData = async () => {
             const [result, result2] = await Promise.all([
                 getDataApi1(api1),
                 getDataApi1(api2)
             ]);
-            console.log(result);
+
+            console.log('result2', result2);
             return [result.data, result2.data];
         };
         getData().then((res) => {
             dataApi1 = res.data;
             console.log('res', res);
+            setCountry(res[1])
             data1 = converData(res[0], res[1]);
             console.log('data1', data1);
             setListData(data1);
-            // setPost(_(data1).slice(0).take(pageSize).value());
             setPost((data1));
             setPostOld(data1);
-            // setPaginatePost(data1);
             setPaginatePost(_(data1).slice(0).take(pageSize).value());
+            // setDataApi2(api2 + `${nameApi}`)
+            // console.log('api2', api2)
         });
-        // console.log("dataApi1", dataApi1);
     }, []);
 
-    //Search title
-    const onChangeHandle = (text) => {
-        let matchesData = text.trim()//xóa khoảng trống đầu và cuối
-        // let matchesData1 = matchesData.length
-        setText(matchesData)
+    //search title, trim() vs timeout 1s
+    const typingTimeoutRef = useRef(null);
+    const onChangeHandle = (e) => {
+        const value = e.target.value;
+        setText(value);
+        if (!onSubmit) return;
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+        typingTimeoutRef.current = setTimeout(() => {
+            const formValues = {
+                value: e.target.value,
+            };
+            onSubmit(formValues);
+            let matchesData = value.trim()
+            setText(matchesData)
+        }, 1000);
     }
 
     //page
-    const pageCount = post ? Math.ceil(post.length / pageSize) : 0;
-    // if (pageCount === 1)
-    //     return null;
-    const pages = _.range(1, pageCount + 1);
+
 
 
     // useEffect(() => {
@@ -105,10 +139,10 @@ function DataFetching() {
     //         console.log('newDataaa', newData)
     //     }
     //     f();
-    // }, [nameApi]); //
+    // }, [nameApi]); 
 
-    // hien thi limit, offset
 
+    //click search
     const handleClickSearch = async () => {
         let res = '';
         let newData = [];
@@ -126,21 +160,29 @@ function DataFetching() {
             setNameapiOld(nameApi);
             newData = await res.json(nameApi);
             setPostOld(newData);
+            setPageIndex(1)
         }
-
+        //Request 1 lan.
         // let newData = await onChangeHandleName(nameApi)
+
         //Offset vs Limit
         setNameApi(nameApi);
         if (Offset && Offset.length == 0) {
             setOffset(newData.length - limit)
         }
         if (limit && limit.length == 0) {
-            setOffset(newData)
+            setOffset(newData);
         }
         let data = newData.slice(parseInt(limit == '' ? 0 : limit),
             parseInt(Offset == '' ? listData.length : Offset) +
             parseInt(limit == '' ? 0 : limit));//điều kiện nếu bằng rỗng
-        // console.log('end', data)
+        setPageIndex(1)
+
+        newData = newData ? Math.ceil(newData.length / Offset) : 0;
+        let pages = _.range(1, newData + 1);
+        console.log('pages', pages)
+        setPaginatePost(_(data).slice(0).take(Offset).value());
+        // setPost(pages)
 
         //tăng dần và giảm dần
         if (order == 'asc') {
@@ -151,7 +193,7 @@ function DataFetching() {
         }
         data = converData(data, country)
         setPost(data)
-        setPaginatePost(data)
+        setPaginatePost(_(data).slice(0).take(pageSize).value());
         // console.log('data', data)
 
         //search title
@@ -162,17 +204,27 @@ function DataFetching() {
                 return post.title.match(regex);
             })
             setPost(matches)
-            setPaginatePost(matches)
+            setPaginatePost(_(matches).slice(0).take(pageSize).value());
+            setPageIndex(1)
         }
         console.log("matches", matches)
         setText(text)
     }
 
+    // let pageSize = [];
+    // let pageCount = [];
+    // let pages = [];
+
     //page
+    const pageSize = 10;// số lượng trong 1 trang
+    const pageCount = post ? Math.ceil(post.length / pageSize) : 0;
+    const pages = _.range(1, pageCount + 1);
+
     const pagination = async (pageNumber) => {
-        setCurrentPage(pageNumber);
-        const startIndex = (pageNumber - 1) * pageSize;
-        const paginatePost = _(post).slice(startIndex).take(pageSize).value();
+        setPageIndex(pageNumber);
+        // console.log('pageNumber', pageNumber)
+        const pageIndex = (pageNumber - 1) * pageSize;
+        const paginatePost = _(post).slice(pageIndex).take(pageSize).value();
         console.log('paginatePost', paginatePost);
         setPaginatePost(paginatePost)
     }
@@ -181,20 +233,24 @@ function DataFetching() {
     //Search id-name-email
     const onChangeHandleName = async (userId) => {
         // console.log('nameApi', nameApi);
-        let newData = ([])
         setNameapiOld(nameApi)
         setNameApi(userId);
         // console.log("newData", nameApi);
 
         //Request 1 lan.
-        // console.log("value", { nameApi });
+        let newData = ([]);
+        // setNameApi(nameApi);
+        // console.log("value", nameApi);
         // if (nameApi && nameApi.length === 0 || nameApi == '') {
         //     newData = [...listData]
         // }
         // else
         //     newData = listData.filter((item) => item.userId == nameApi);
-
+        // console.log('newData', newData)
+        // // setNameApi(newData);
+        // setNameapiOld(nameApi)
         // setPost(newData);
+        // setPostOld(newData);
         // return newData;
     }
 
@@ -212,23 +268,6 @@ function DataFetching() {
         // setPost(postCopy)
         // setNameOrder(nameOrder)
     }
-
-
-    // const handleSearchInput = (lit, off) => {
-    //     let newData = onChangeHandleName(nameApi);
-    //     let data = newData.slice(parseInt(lit), parseInt(off) + parseInt(lit));
-    //     setPost(data)
-    // }
-
-    // const handleLimit = (e) => {
-    //     setLimit(e.target.value == '' ? 0 : e.target.value);
-    //     handleSearchInput(e.target.value == '' ? 0 : e.target.value, Offset);
-    // }
-
-    // const handleOffset = (e) => {
-    //     setOffset(e.target.value == '' ? 0 : e.target.value);
-    //     handleSearchInput(limit, e.target.value == '' ? 0 : e.target.value);
-    // }
 
     return (
         <div>
@@ -292,7 +331,7 @@ function DataFetching() {
                         <div className='filter-search'>
                             <input
                                 type="search"
-                                onChange={e => onChangeHandle(e.target.value)}
+                                onChange={onChangeHandle}
                                 value={text}
                                 className="col-md-12 input"
                                 placeholder='Search title'
@@ -339,7 +378,7 @@ function DataFetching() {
                 <ul className='pagination'>
                     {
                         pages.map((page) => (
-                            <li className={page === currentPage ? "page-item active" : "page-item"}
+                            <li className={page === pageIndex ? "page-item active" : "page-item"}
                             >
                                 <p className='page-link'
                                     onClick={() => pagination(page)}
@@ -349,12 +388,15 @@ function DataFetching() {
                             </li>
                         ))
                     }
+
+
                     <span>
-                        Page{''}
+                        Page{': '}
                         <strong>
-                            {pages.length} of {pageCount}
-                        </strong>{' '}
+                            {pageIndex} of {pageCount}
+                        </strong>
                     </span>
+
                 </ul>
             </div>
         </div>

@@ -28,6 +28,9 @@ function App() {
   //   fetchData();
   // },
   //   []);
+  const onChangeHandle = (newText) => {
+    console.log('newText', newText)
+  }
 
   return (
     <>
@@ -38,7 +41,7 @@ function App() {
 
       <div className='control-table'>
         {/* <PostApi postt={data} /> */}
-        <DataFetching />
+        <DataFetching onSubmit={onChangeHandle} />
         <Table data={data} />
       </div>
     </>
